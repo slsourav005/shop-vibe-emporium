@@ -4,7 +4,7 @@ import HeroBanner from "@/components/HeroBanner";
 import ProductCard from "@/components/ProductCard";
 import ProductDetailModal from "@/components/ProductDetailModal";
 import CheckoutModal from "@/components/CheckoutModal";
-import type { Product } from "@/data/products";
+import { mockProducts, type Product } from "@/data/products";
 
 const FALLBACK_IMAGE =
   "https://images.unsplash.com/photo-1542838132-92c53300491e?w=600&h=600&fit=crop";
@@ -16,8 +16,25 @@ const parsePrice = (priceStr: string | number | undefined): number => {
   return match ? parseFloat(match[1]) : 0;
 };
 
+const titleCase = (s: string) =>
+  s
+    .split(" ")
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+
+// Filter out junk AI-extracted names like "unknown", "i am selling rice", long sentences
+const isValidItemName = (name: string): boolean => {
+  if (!name) return false;
+  const n = name.toLowerCase().trim();
+  if (n === "unknown" || n.length < 2) return false;
+  if (n.split(" ").length > 4) return false; // long phrases = bad extraction
+  if (/\b(i|am|want|selling|sell|to)\b/.test(n)) return false;
+  return true;
+};
+
 const Index = () => {
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<Product[]>(mockProducts);
   const [search, setSearch] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [checkoutProduct, setCheckoutProduct] = useState<Product | null>(null);
@@ -27,31 +44,33 @@ const Index = () => {
     fetch("https://vyapar-vaani.onrender.com/products")
       .then((res) => res.json())
       .then((data) => {
-        // Flatten backend shape: each doc has an `items` array
-        const flattened: Product[] = [];
-        let idCounter = 1;
+        let idCounter = 1000; // start above mock IDs
+        const userListed: Product[] = [];
 
         (Array.isArray(data) ? data : []).forEach((doc: any) => {
           (doc.items || []).forEach((item: any) => {
-            const suggested = parsePrice(item.suggestedPrice);
-            flattened.push({
+            if (!isValidItemName(item.name)) return;
+
+            const suggested = parsePrice(item.suggestedPrice) || 100;
+            const cleanName = titleCase(item.name.trim());
+
+            userListed.push({
               id: idCounter++,
-              name: item.name
-                ? item.name.charAt(0).toUpperCase() + item.name.slice(1)
-                : "Unknown",
-              price: suggested ? Math.max(1, Math.round(suggested * 0.9)) : 100,
-              suggestedPrice: suggested || 100,
+              name: cleanName,
+              price: Math.max(1, Math.round(suggested * 0.9)),
+              suggestedPrice: suggested,
               quantity: item.quantity || "1 unit",
               description:
-                `Fresh ${item.name || "product"} sourced directly from rural artisans and farmers. ` +
-                `Quantity: ${item.quantity || "1 unit"}.`,
+                `Freshly listed by a local seller through Vyapar Vaani. ` +
+                `${cleanName} available in quantity of ${item.quantity || "1 unit"}. ` +
+                `Sourced directly from rural producers — fair price, no middlemen.`,
               image: item.imageUrl || FALLBACK_IMAGE,
-              category: "General",
+              category: "Community Listings",
             });
           });
         });
 
-        setProducts(flattened);
+        setProducts([...mockProducts, ...userListed]);
       })
       .catch((err) => console.error(err));
   }, []);
