@@ -1,20 +1,30 @@
-import { useState, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Navbar from "@/components/Navbar";
 import HeroBanner from "@/components/HeroBanner";
 import ProductCard from "@/components/ProductCard";
 import ProductDetailModal from "@/components/ProductDetailModal";
 import CheckoutModal from "@/components/CheckoutModal";
-import { products, type Product } from "@/data/products";
+import type { Product } from "@/data/products";
 
 const Index = () => {
+  const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [checkoutProduct, setCheckoutProduct] = useState<Product | null>(null);
   const [activeCategory, setActiveCategory] = useState("All");
 
+  useEffect(() => {
+    fetch("http://localhost:3000/products")
+      .then((res) => res.json())
+      .then((data) => {
+        setProducts(data);
+      })
+      .catch((err) => console.error(err));
+  }, []);
+
   const categories = useMemo(
     () => ["All", ...Array.from(new Set(products.map((p) => p.category)))],
-    []
+    [products]
   );
 
   const filtered = useMemo(() => {
