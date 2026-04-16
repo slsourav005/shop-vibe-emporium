@@ -6,6 +6,16 @@ import ProductDetailModal from "@/components/ProductDetailModal";
 import CheckoutModal from "@/components/CheckoutModal";
 import type { Product } from "@/data/products";
 
+const FALLBACK_IMAGE =
+  "https://images.unsplash.com/photo-1542838132-92c53300491e?w=600&h=600&fit=crop";
+
+const parsePrice = (priceStr: string | number | undefined): number => {
+  if (typeof priceStr === "number") return priceStr;
+  if (!priceStr) return 0;
+  const match = String(priceStr).match(/(\d+(\.\d+)?)/);
+  return match ? parseFloat(match[1]) : 0;
+};
+
 const Index = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState("");
@@ -14,10 +24,34 @@ const Index = () => {
   const [activeCategory, setActiveCategory] = useState("All");
 
   useEffect(() => {
-    fetch("http://localhost:3000/products")
+    fetch("https://vyapar-vaani.onrender.com/products")
       .then((res) => res.json())
       .then((data) => {
-        setProducts(data);
+        // Flatten backend shape: each doc has an `items` array
+        const flattened: Product[] = [];
+        let idCounter = 1;
+
+        (Array.isArray(data) ? data : []).forEach((doc: any) => {
+          (doc.items || []).forEach((item: any) => {
+            const suggested = parsePrice(item.suggestedPrice);
+            flattened.push({
+              id: idCounter++,
+              name: item.name
+                ? item.name.charAt(0).toUpperCase() + item.name.slice(1)
+                : "Unknown",
+              price: suggested ? Math.max(1, Math.round(suggested * 0.9)) : 100,
+              suggestedPrice: suggested || 100,
+              quantity: item.quantity || "1 unit",
+              description:
+                `Fresh ${item.name || "product"} sourced directly from rural artisans and farmers. ` +
+                `Quantity: ${item.quantity || "1 unit"}.`,
+              image: item.imageUrl || FALLBACK_IMAGE,
+              category: "General",
+            });
+          });
+        });
+
+        setProducts(flattened);
       })
       .catch((err) => console.error(err));
   }, []);
@@ -37,7 +71,7 @@ const Index = () => {
       );
     }
     return list;
-  }, [search, activeCategory]);
+  }, [search, activeCategory, products]);
 
   const handleBuyNow = (product: Product) => {
     setSelectedProduct(null);
