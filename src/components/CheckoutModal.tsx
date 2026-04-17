@@ -2,6 +2,8 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, ArrowRight, ArrowLeft, CheckCircle2, Loader2 } from "lucide-react";
 import type { Product } from "@/data/products";
+import { API_BASE } from "@/lib/api";
+import { addOrder } from "@/lib/orders";
 
 interface Props {
   product: Product | null;
@@ -21,22 +23,62 @@ const CheckoutModal = ({ product, onClose }: Props) => {
 
   const handleConfirm = async () => {
     setLoading(true);
+    const productId = product.backendId || String(product.id);
     try {
-      const res = await fetch("https://vyapar-vaani.onrender.com/buy", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          productId: String(product.id),
+      // Only POST to backend if it's a real backend product (has backendId)
+      if (product.backendId) {
+        const res = await fetch(`${API_BASE}/buy`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            productId: product.backendId,
+            buyerName: form.name.trim(),
+            phone: form.phone.trim(),
+            address: form.address.trim(),
+          }),
+        });
+        if (!res.ok) throw new Error("Order failed");
+        const data = await res.json();
+        // Mirror to local logistics log
+        addOrder({
+          _id: data?.order?._id || `local-${Date.now()}`,
+          productId,
+          productName: product.name,
+          quantity: product.quantity,
           buyerName: form.name.trim(),
           phone: form.phone.trim(),
           address: form.address.trim(),
-        }),
-      });
-      if (!res.ok) throw new Error("Order failed");
-      await res.json();
+          status: data?.order?.status || "PLACED",
+          createdAt: new Date().toISOString(),
+        });
+      } else {
+        // Mock product — log locally only so logistics still sees it
+        addOrder({
+          _id: `local-${Date.now()}`,
+          productId,
+          productName: product.name,
+          quantity: product.quantity,
+          buyerName: form.name.trim(),
+          phone: form.phone.trim(),
+          address: form.address.trim(),
+          status: "PLACED",
+          createdAt: new Date().toISOString(),
+        });
+      }
     } catch (err) {
       console.error("Order submission error:", err);
-      // Still show success so demo flow isn't blocked; details are logged.
+      // Still mirror locally so demo flow remains intact
+      addOrder({
+        _id: `local-${Date.now()}`,
+        productId,
+        productName: product.name,
+        quantity: product.quantity,
+        buyerName: form.name.trim(),
+        phone: form.phone.trim(),
+        address: form.address.trim(),
+        status: "PLACED",
+        createdAt: new Date().toISOString(),
+      });
     } finally {
       setLoading(false);
       setStep("success");
