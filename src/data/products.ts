@@ -8,6 +8,7 @@ import basketImg from "@/assets/product-basket.jpg";
 
 export interface Product {
   id: number;
+  backendId?: string;
   name: string;
   price: number;
   suggestedPrice: number;

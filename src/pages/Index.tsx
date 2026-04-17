@@ -49,27 +49,27 @@ const Index = () => {
         let idCounter = 1000;
         const userListed: Product[] = [];
 
+        // Backend now returns flat product docs:
+        // { _id, sellerId, name, quantity, suggestedPrice, status }
         (Array.isArray(data) ? data : []).forEach((doc: any) => {
-          (doc.items || []).forEach((item: any) => {
-            if (!isValidItemName(item.name)) return;
+          if (!isValidItemName(doc.name)) return;
 
-            const suggested = parsePrice(item.suggestedPrice) || 100;
-            const cleanName = titleCase(item.name.trim());
+          const suggested = parsePrice(doc.suggestedPrice) || 100;
+          const cleanName = titleCase(String(doc.name).trim());
 
-            userListed.push({
-              id: idCounter++,
-              backendId: doc._id,
-              name: cleanName,
-              price: Math.max(1, Math.round(suggested * 0.9)),
-              suggestedPrice: suggested,
-              quantity: item.quantity || "1 unit",
-              description:
-                `Freshly listed by a local seller through Vyapar Vaani. ` +
-                `${cleanName} available in quantity of ${item.quantity || "1 unit"}. ` +
-                `Sourced directly from rural producers — fair price, no middlemen.`,
-              image: item.imageUrl || FALLBACK_IMAGE,
-              category: "Community Listings",
-            });
+          userListed.push({
+            id: idCounter++,
+            backendId: doc._id,
+            name: cleanName,
+            price: Math.max(1, Math.round(suggested * 0.9)),
+            suggestedPrice: suggested,
+            quantity: doc.quantity || "1 unit",
+            description:
+              `Freshly listed by a local seller through Vyapar Vaani. ` +
+              `${cleanName} available in quantity of ${doc.quantity || "1 unit"}. ` +
+              `Sourced directly from rural producers — fair price, no middlemen.`,
+            image: FALLBACK_IMAGE,
+            category: "Community Listings",
           });
         });
 
