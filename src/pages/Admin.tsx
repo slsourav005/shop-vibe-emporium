@@ -1,78 +1,34 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Package, Truck, RefreshCw, CheckCircle2, Clock, MapPin, User, Phone } from "lucide-react";
+import { ArrowLeft, Package, Truck, RefreshCw, CheckCircle2, Clock, MapPin, User, Phone, Inbox } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import SellerChat from "@/components/SellerChat";
-import { API_BASE } from "@/lib/api";
-
-interface Order {
-  _id: string;
-  productId: string;
-  buyerName: string;
-  phone?: string;
-  address: string;
-  status: string;
-}
-
-interface ProductDoc {
-  _id: string;
-  items: { name: string; quantity: string; suggestedPrice: string }[];
-}
+import { loadOrders, updateOrderStatus, type LocalOrder } from "@/lib/orders";
 
 const STATUSES = ["PLACED", "PACKED", "SHIPPED", "DELIVERED"];
 
 const Admin = () => {
   const [tab, setTab] = useState<"logistics" | "sell">("logistics");
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [products, setProducts] = useState<Record<string, ProductDoc>>({});
-  const [loading, setLoading] = useState(true);
-  const [updating, setUpdating] = useState<string | null>(null);
+  const [orders, setOrders] = useState<LocalOrder[]>([]);
 
-  const fetchAll = async () => {
-    try {
-      const [ordersRes, productsRes] = await Promise.all([
-        fetch(`${API_BASE}/orders`).then((r) => r.json()),
-        fetch(`${API_BASE}/products`).then((r) => r.json()),
-      ]);
-      setOrders(Array.isArray(ordersRes) ? ordersRes.reverse() : []);
-      const map: Record<string, ProductDoc> = {};
-      (Array.isArray(productsRes) ? productsRes : []).forEach((p: ProductDoc) => {
-        map[p._id] = p;
-      });
-      setProducts(map);
-    } catch (err) {
-      console.error("Admin fetch error:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const refresh = () => setOrders(loadOrders());
 
   useEffect(() => {
-    fetchAll();
-    const t = setInterval(fetchAll, 5000);
-    return () => clearInterval(t);
+    refresh();
+    const onChange = () => refresh();
+    window.addEventListener("vv:orders-changed", onChange);
+    window.addEventListener("storage", onChange);
+    const t = setInterval(refresh, 5000);
+    return () => {
+      window.removeEventListener("vv:orders-changed", onChange);
+      window.removeEventListener("storage", onChange);
+      clearInterval(t);
+    };
   }, []);
 
-  const updateStatus = async (orderId: string, status: string) => {
-    setUpdating(orderId);
-    try {
-      await fetch(`${API_BASE}/update-status`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId, status }),
-      });
-      await fetchAll();
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setUpdating(null);
-    }
-  };
-
-  const productLabel = (productId: string) => {
-    const p = products[productId];
-    if (!p) return "Unknown product";
-    return p.items.map((i) => `${i.name} (${i.quantity})`).join(", ");
+  const handleStatus = (id: string, status: string) => {
+    updateOrderStatus(id, status);
+    refresh();
   };
 
   return (
@@ -87,7 +43,7 @@ const Admin = () => {
             <ArrowLeft className="h-4 w-4" /> Back to marketplace
           </Link>
           <button
-            onClick={fetchAll}
+            onClick={refresh}
             className="flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
           >
             <RefreshCw className="h-3.5 w-3.5" /> Refresh
@@ -109,6 +65,11 @@ const Admin = () => {
             }`}
           >
             <Truck className="h-4 w-4" /> Logistics
+            {orders.length > 0 && (
+              <span className="ml-1 rounded-full bg-background/20 px-1.5 text-[10px]">
+                {orders.length}
+              </span>
+            )}
           </button>
           <button
             onClick={() => setTab("sell")}
@@ -124,13 +85,13 @@ const Admin = () => {
 
         {tab === "logistics" && (
           <div className="space-y-3">
-            {loading && (
-              <p className="text-sm text-muted-foreground">Loading orders…</p>
-            )}
-            {!loading && orders.length === 0 && (
+            {orders.length === 0 && (
               <div className="rounded-2xl border border-dashed border-border p-12 text-center">
-                <Truck className="mx-auto h-10 w-10 text-muted-foreground" />
+                <Inbox className="mx-auto h-10 w-10 text-muted-foreground" />
                 <p className="mt-3 text-sm text-muted-foreground">No orders yet.</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Orders placed in this browser will appear here for logistics tracking.
+                </p>
               </div>
             )}
             {orders.map((o) => (
@@ -140,15 +101,21 @@ const Admin = () => {
               >
                 <div className="flex flex-col gap-4 sm:flex-row sm:justify-between">
                   <div className="flex-1">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
                         #{o._id.slice(-6)}
                       </span>
                       <StatusBadge status={o.status} />
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(o.createdAt).toLocaleString()}
+                      </span>
                     </div>
 
                     <p className="mt-2 text-sm font-semibold text-foreground capitalize">
-                      {productLabel(o.productId)}
+                      {o.productName}{" "}
+                      <span className="font-normal text-muted-foreground">
+                        · {o.quantity}
+                      </span>
                     </p>
 
                     <div className="mt-3 grid gap-1.5 text-xs text-muted-foreground sm:grid-cols-2">
@@ -172,8 +139,8 @@ const Admin = () => {
                     {STATUSES.map((s) => (
                       <button
                         key={s}
-                        disabled={updating === o._id || o.status === s}
-                        onClick={() => updateStatus(o._id, s)}
+                        disabled={o.status === s}
+                        onClick={() => handleStatus(o._id, s)}
                         className={`rounded-full px-3 py-1 text-xs font-medium transition-all disabled:opacity-50 ${
                           o.status === s
                             ? "bg-primary text-primary-foreground"
