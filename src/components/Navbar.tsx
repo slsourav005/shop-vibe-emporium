@@ -1,5 +1,6 @@
-import { ShoppingBag, Search, Menu } from "lucide-react";
+import { ShoppingBag, Search, Sparkles, Truck } from "lucide-react";
 import { useState } from "react";
+import { Link } from "react-router-dom";
 
 interface NavbarProps {
   onSearch: (query: string) => void;
@@ -11,12 +12,12 @@ const Navbar = ({ onSearch }: NavbarProps) => {
   return (
     <nav className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-lg">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6">
-        <div className="flex items-center gap-2">
+        <Link to="/" className="flex items-center gap-2">
           <ShoppingBag className="h-7 w-7 text-primary" />
           <span className="text-xl font-bold text-foreground">
             Vyapar<span className="text-primary"> Vaani</span>
           </span>
-        </div>
+        </Link>
 
         <div className="hidden items-center gap-1 rounded-full border border-border bg-muted/50 px-3 py-1.5 sm:flex sm:w-80">
           <Search className="h-4 w-4 text-muted-foreground" />
@@ -28,7 +29,19 @@ const Navbar = ({ onSearch }: NavbarProps) => {
           />
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
+          <Link
+            to="/sell"
+            className="hidden items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/15 sm:inline-flex"
+          >
+            <Sparkles className="h-3.5 w-3.5" /> Sell
+          </Link>
+          <Link
+            to="/admin"
+            className="hidden items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground sm:inline-flex"
+          >
+            <Truck className="h-3.5 w-3.5" /> Admin
+          </Link>
           <button
             className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:hidden"
             onClick={() => setSearchOpen(!searchOpen)}

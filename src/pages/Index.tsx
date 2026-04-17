@@ -1,10 +1,12 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import Navbar from "@/components/Navbar";
 import HeroBanner from "@/components/HeroBanner";
 import ProductCard from "@/components/ProductCard";
 import ProductDetailModal from "@/components/ProductDetailModal";
 import CheckoutModal from "@/components/CheckoutModal";
+import FloatingChatButton from "@/components/FloatingChatButton";
 import { mockProducts, type Product } from "@/data/products";
+import { API_BASE } from "@/lib/api";
 
 const FALLBACK_IMAGE =
   "https://images.unsplash.com/photo-1542838132-92c53300491e?w=600&h=600&fit=crop";
@@ -40,11 +42,11 @@ const Index = () => {
   const [checkoutProduct, setCheckoutProduct] = useState<Product | null>(null);
   const [activeCategory, setActiveCategory] = useState("All");
 
-  useEffect(() => {
-    fetch("https://vyapar-vaani.onrender.com/products")
+  const fetchProducts = useCallback(() => {
+    fetch(`${API_BASE}/products`)
       .then((res) => res.json())
       .then((data) => {
-        let idCounter = 1000; // start above mock IDs
+        let idCounter = 1000;
         const userListed: Product[] = [];
 
         (Array.isArray(data) ? data : []).forEach((doc: any) => {
@@ -56,6 +58,7 @@ const Index = () => {
 
             userListed.push({
               id: idCounter++,
+              backendId: doc._id,
               name: cleanName,
               price: Math.max(1, Math.round(suggested * 0.9)),
               suggestedPrice: suggested,
@@ -74,6 +77,12 @@ const Index = () => {
       })
       .catch((err) => console.error(err));
   }, []);
+
+  useEffect(() => {
+    fetchProducts();
+    const t = setInterval(fetchProducts, 5000);
+    return () => clearInterval(t);
+  }, [fetchProducts]);
 
   const categories = useMemo(
     () => ["All", ...Array.from(new Set(products.map((p) => p.category)))],
@@ -155,6 +164,8 @@ const Index = () => {
       <footer className="border-t border-border py-8 text-center text-sm text-muted-foreground">
         <p>© 2026 Vyapar Vaani — Empowering Rural Commerce</p>
       </footer>
+
+      <FloatingChatButton onListed={fetchProducts} />
     </div>
   );
 };
